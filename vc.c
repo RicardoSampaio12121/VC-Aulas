@@ -593,3 +593,53 @@ int vc_rgb_to_hsv(IVC *src, IVC *dst)
 	}
 	return 1;
 }
+
+
+int vc_hsv_segmentation(IVC *src, IVC *dst, int hmin, int hmax, int smin, int smax, int vmin, int vmax)
+{
+    int size = src->width * src->height * src->channels;
+    int pos_src, pos_dst;
+    int value;
+    int z = 0;
+
+    for(int i = 0; i < size; i+=src->channels)
+    {
+        //puts("entra aquiiiiiii");
+
+        /* printf("1: %d\n", src->data[i]);
+        printf("1: %d\n", src->data[i+1]);
+        printf("1: %d\n", src->data[i+2]);
+        getchar(); */
+
+
+
+        /* int h = src->data[i];
+        int s = src->data[i+1];
+        int v = src->data[i+2];  */
+
+        float h = ((float)src->data[i] / 255.0f) * 360.0f;
+        float s = (src->data[i+1] / 255.0f) * 100.0f;
+        float v = (src->data[i+2] / 255.0f) * 100.0f; 
+        //puts("passa aquiii");
+
+
+        if(h >= hmin && h <= hmax && s >= smin && s <= smax && v >= vmin && v <= vmax) 
+        {
+            value = 255;
+        } 
+        else
+        {
+            value = 0;
+        }
+
+        //puts("antes de por");
+        /* printf("value: %hhn\n", (unsigned char *)value);
+        printf("Z: %d\n", z); */
+        
+        dst->data[z] = (unsigned char) value;
+
+        //puts("antes do z++");
+        z++;
+        //puts("depois do z++");
+    }
+}
