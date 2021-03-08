@@ -523,3 +523,73 @@ int vc_rgb_to_gray(IVC *src, IVC *dst)
     }
     return 1;
 }
+
+int vc_rgb_to_hsv(IVC *src, IVC *dst)
+{
+    unsigned char *data = (unsigned char *) src->data;
+	int width = src->width;
+	int height = src->height;
+	int bytesperline = src->bytesperline;
+	int channels = src->channels;
+	float r, g, b, hue, saturation, value;
+	float rgb_max, rgb_min;
+	int i, size;
+
+	size = width * height * channels;
+	
+	for(i=0; i<size; i+=channels)
+	{
+       
+		r = (float) data[i];
+		g = (float) data[i + 1];
+		b = (float) data[i + 2];
+		
+		// Calcula valores m�ximo e m�nimo dos canais de cor R, G e B
+		rgb_max = (r > g ? (r > b ? r : b) : (g > b ? g : b));
+		rgb_min = (r < g ? (r < b ? r : b) : (g < b ? g : b));
+		
+		// Value toma valores entre [0, 255]
+		value = rgb_max;
+		if(value == 0.0f)
+		{
+			hue = 0.0f;
+			saturation = 0.0f;
+		}
+		else
+		{
+			// Saturation toma valores entre [0, 1]
+			saturation = ((rgb_max - rgb_min) / rgb_max);
+
+			if(saturation == 0.0f)
+			{
+				hue = 0.0f;
+			}
+			else
+			{
+				// Hue toma valores entre [0, 360]
+				if((rgb_max == r) && (g >= b))
+				{
+					hue = 60.0f * (g - b) / (rgb_max - rgb_min);
+				}
+				else if((rgb_max == r) && (b > g))
+				{
+					hue = 360.0f + 60.0f * (g - b) / (rgb_max - rgb_min);
+				}
+				else if(rgb_max == g)
+				{
+					hue = 120.0f + 60.0f * (b - r) / (rgb_max - rgb_min);
+				}
+				else /* rgb_max == b*/
+				{
+					hue = 240.0f + 60.0f * (r - g) / (rgb_max - rgb_min);
+				}
+			}
+		}
+
+		// Atribui valores entre [0, 255]
+		dst->data[i]     = (unsigned char) (hue / 360.0f * 255.0f);
+		dst->data[i + 1] = (unsigned char) (saturation * 255.0f);
+		dst->data[i + 2] = (unsigned char) (value);
+	}
+	return 1;
+}

@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include "vc.h"
+#include <string.h>
 
 int main(void){
     IVC *src, *dst;
     int x, y;
     long int pos;
 
-    src = vc_read_image("Images/Classic/pepper.ppm");
-    dst = vc_image_new(src->width, src->height, 1, src->levels);
+    src = vc_read_image("Images/HSV/HSVTestImage01.ppm");
+    dst = vc_image_new(src->width, src->height, src->channels, src->levels);
 
     if(src == NULL)
     {
@@ -16,10 +17,17 @@ int main(void){
         return 0;
     }
 
-    
-    vc_rgb_to_gray(src, dst);
+    if(dst == NULL)
+    {
+        printf("ERROR -> vc_read_image():\n\tFile not found!\n");
+        getchar();
+        return 0;
+    }
 
-    vc_write_image("goldhill.pgm", dst);
+    
+    vc_rgb_to_hsv(src, dst);
+
+    vc_write_image("goldhill.ppm", dst);
 
     vc_image_free(src);
     vc_image_free(dst);
