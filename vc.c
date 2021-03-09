@@ -598,48 +598,67 @@ int vc_rgb_to_hsv(IVC *src, IVC *dst)
 int vc_hsv_segmentation(IVC *src, IVC *dst, int hmin, int hmax, int smin, int smax, int vmin, int vmax)
 {
     int size = src->width * src->height * src->channels;
-    int pos_src, pos_dst;
     int value;
     int z = 0;
 
     for(int i = 0; i < size; i+=src->channels)
     {
-        //puts("entra aquiiiiiii");
-
-        /* printf("1: %d\n", src->data[i]);
-        printf("1: %d\n", src->data[i+1]);
-        printf("1: %d\n", src->data[i+2]);
-        getchar(); */
-
-
-
-        /* int h = src->data[i];
-        int s = src->data[i+1];
-        int v = src->data[i+2];  */
-
         float h = ((float)src->data[i] / 255.0f) * 360.0f;
         float s = (src->data[i+1] / 255.0f) * 100.0f;
         float v = (src->data[i+2] / 255.0f) * 100.0f; 
-        //puts("passa aquiii");
-
+    
 
         if(h >= hmin && h <= hmax && s >= smin && s <= smax && v >= vmin && v <= vmax) 
         {
-            value = 255;
+            dst->data[z] = (unsigned char) 255;
         } 
         else
         {
-            value = 0;
+            dst->data[z] = (unsigned char) 0;
+        }
+        z++;
+    }
+}
+
+//Recebe uma imagem com 1 canal
+//Sai uma imagem com 3 canais
+int vc_scale_gray_to_rgb(IVC *src, IVC *dst)
+{
+    int size = src->width * src->height * dst->channels;
+    int z = 0;
+    int r, g, b;
+
+    for(int i = 0; i < size; i += dst->channels)
+    {
+        if(src->data[z] < 64)
+        {
+            r = 0;
+            g = src->data[z] * 4;
+            b = 255;
+        }
+        else if(src->data[z] >= 64 && src->data[z] < 128)
+        {
+            r = 0;
+            g = 255;
+            b = 255 - (src->data[z] - 64) * 4;
+        }
+        else if(src->data[z] >= 128 && src->data[z] < 192)
+        {
+            r = 255 - (src->data[z] + 128) * 4;
+            g = 255;
+            b = 0;
+        }
+        else
+        {
+            r = 255;
+            g = 255 - (src->data[z] - 192) * 4;
+            b = 0;
         }
 
-        //puts("antes de por");
-        /* printf("value: %hhn\n", (unsigned char *)value);
-        printf("Z: %d\n", z); */
-        
-        dst->data[z] = (unsigned char) value;
+        dst->data[i] = (unsigned char)r;
+        dst->data[i+1] = (unsigned char)g;
+        dst->data[i+2] = (unsigned char)b;
 
-        //puts("antes do z++");
         z++;
-        //puts("depois do z++");
     }
 }

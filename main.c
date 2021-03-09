@@ -7,9 +7,9 @@ int main(void){
     int x, y;
     long int pos;
 
-    src = vc_read_image("Images/HSV/HSVTestImage01.ppm");
+    src = vc_read_image("Images/FLIR/flir-04.pgm");
     dst = vc_image_new(src->width, src->height, 3, src->levels);
-    dstt = vc_image_new(src->width, src->height, 1, src->levels);
+   
 
     if(src == NULL)
     {
@@ -26,14 +26,10 @@ int main(void){
     }
 
     
-    vc_rgb_to_hsv(src, dst);
-    
-    printf("esta aqui\n");
-    vc_hsv_segmentation(dst, dstt, 30, 70, 50, 100, 60, 100);
+   
+    vc_scale_gray_to_rgb(src, dst);
 
-
-
-    vc_write_image("teste.ppm", dstt);
+    vc_write_image("teste.ppm", dst);
 
 
     vc_image_free(src);

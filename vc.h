@@ -49,3 +49,5 @@ int vc_rgb_to_gray(IVC *src, IVC *dst);
 int vc_rgb_to_hsv(IVC *src, IVC *dst);
 
 int vc_hsv_segmentation(IVC *src, IVC *dst, int hmin, int hmax, int smin, int smax, int vmin, int vmax);
+
+int vc_scale_gray_to_rgb(IVC *src, IVC *dst);
