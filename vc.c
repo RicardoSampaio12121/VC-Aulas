@@ -662,3 +662,197 @@ int vc_scale_gray_to_rgb(IVC *src, IVC *dst)
         z++;
     }
 }
+
+int vc_gray_to_binary(IVC *src, IVC *dst, int threshold)
+{
+    int size = src->height * src->width;
+
+    for(int i = 0; i < size; i ++)
+    {
+        if(src->data[i] > threshold)
+        {
+            dst->data[i] = 1;
+        }
+        else
+        {
+            dst->data[i] = 0;
+        }
+    }
+}
+
+int vc_gray_to_binary_global_mean(IVC *src, IVC *dst)
+{
+    int size = src->height * src->width;
+    int count = 0;
+
+    for(int i = 0; i < size; i++)
+    {
+        count += (int)src->data[i];
+    }
+
+    int threshold = count / size;
+
+    vc_gray_to_binary(src, dst, threshold);
+}
+
+int vc_gray_to_binary_midpoint(IVC *src, IVC *dst, int kernel)
+{
+	unsigned char *datasrc = (unsigned char *)src->data;
+	unsigned char *datadst = (unsigned char *)dst->data;
+	int width = src->width;
+	int height = src->height;
+	int bytesperline = src->bytesperline;
+	int channels = src->channels;
+	int x, y, kx, ky;
+	int offset = (kernel - 1) / 2; //(int) floor(((double) kernel) / 2.0);
+	int max, min;
+	long int pos, posk;
+	unsigned char threshold;
+
+	// Verificação de erros
+	if ((src->width <= 0) || (src->height <= 0) || (src->data == NULL)) return 0;
+	if ((src->width != dst->width) || (src->height != dst->height) || (src->channels != dst->channels)) return 0;
+	if (channels != 1) return 0;
+
+	for (y = 0; y<height; y++)
+	{
+		for (x = 0; x<width; x++)
+		{
+			pos = y * bytesperline + x * channels;
+
+			max = 0;
+			min = 255;
+
+			// NxM Vizinhos
+			for (ky = -offset; ky <= offset; ky++)
+			{
+				for (kx = -offset; kx <= offset; kx++)
+				{
+					if ((y + ky >= 0) && (y + ky < height) && (x + kx >= 0) && (x + kx < width))
+					{
+						posk = (y + ky) * bytesperline + (x + kx) * channels;
+
+						if (datasrc[posk] > max) max = datasrc[posk];
+						if (datasrc[posk] < min) min = datasrc[posk];
+					}
+				}
+			}
+
+			threshold = (unsigned char)((float)(max + min) / (float)2);
+
+			if (datasrc[pos] > threshold) datadst[pos] = 255;
+			else datadst[pos] = 0;
+		}
+	}
+
+	return 1;
+}
+
+
+int vc_binary_dilate(IVC *src, IVC *dst, int kernel)
+{
+    unsigned char *datasrc = (unsigned char *)src->data;
+	unsigned char *datadst = (unsigned char *)dst->data;
+	int width = src->width;
+	int height = src->height;
+	int bytesperline = src->bytesperline;
+	int channels = src->channels;
+	int x, y, kx, ky;
+	int offset = (kernel - 1) / 2; //(int) floor(((double) kernel) / 2.0);
+	int max, min;
+	long int pos, posk;
+	unsigned char threshold;
+    int isT = 0;
+    
+
+	// Verificação de erros
+	if ((src->width <= 0) || (src->height <= 0) || (src->data == NULL)) return 0;
+	if ((src->width != dst->width) || (src->height != dst->height) || (src->channels != dst->channels)) return 0;
+	if (channels != 1) return 0;
+
+	for (y = 0; y<height; y++)
+	{
+		for (x = 0; x<width; x++)
+		{
+			pos = y * bytesperline + x * channels;
+
+			max = 0;
+			min = 255;
+
+            isT = 0;
+			// NxM Vizinhos
+			for (ky = -offset; ky <= offset; ky++)
+			{
+				for (kx = -offset; kx <= offset; kx++)
+				{
+					if ((y + ky >= 0) && (y + ky < height) && (x + kx >= 0) && (x + kx < width))
+					{                        
+                        posk = (y + ky) * bytesperline + (x + kx) * channels;
+						if(datasrc[posk] == 255) isT = 1;
+                    }
+				}
+			}
+
+			threshold = (unsigned char)((float)(max + min) / (float)2);
+
+            if(isT == 1) datadst[pos] = 255;
+            else datadst[pos] = 0;
+		}
+	}
+
+	return 1;
+}
+
+int vc_binary_erode(IVC *src, IVC *dst, int kernel)
+{
+    unsigned char *datasrc = (unsigned char *)src->data;
+	unsigned char *datadst = (unsigned char *)dst->data;
+	int width = src->width;
+	int height = src->height;
+	int bytesperline = src->bytesperline;
+	int channels = src->channels;
+	int x, y, kx, ky;
+	int offset = (kernel - 1) / 2; //(int) floor(((double) kernel) / 2.0);
+	int max, min;
+	long int pos, posk;
+	unsigned char threshold;
+    int isT = 0;
+
+	// Verificação de erros
+	if ((src->width <= 0) || (src->height <= 0) || (src->data == NULL)) return 0;
+	if ((src->width != dst->width) || (src->height != dst->height) || (src->channels != dst->channels)) return 0;
+	if (channels != 1) return 0;
+
+	for (y = 0; y<height; y++)
+	{
+		for (x = 0; x<width; x++)
+		{
+			pos = y * bytesperline + x * channels;
+
+			max = 0;
+			min = 255;
+            
+            isT = 0;
+			// NxM Vizinhos
+			for (ky = -offset; ky <= offset; ky++)
+			{
+				for (kx = -offset; kx <= offset; kx++)
+				{
+					if ((y + ky >= 0) && (y + ky < height) && (x + kx >= 0) && (x + kx < width))
+					{                        
+                        posk = (y + ky) * bytesperline + (x + kx) * channels;
+						if(datasrc[posk] == 0) isT = 1;
+                        
+					}
+				}
+			}
+
+			threshold = (unsigned char)((float)(max + min) / (float)2);
+
+            if(isT == 1) datadst[pos] = 0;
+            else datadst[pos] = 255;
+		}
+	}
+
+	return 1;
+}
