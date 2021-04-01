@@ -3,23 +3,30 @@
 #include <string.h>
 
 int main(void){
-    IVC *src, *dst, *dstt, *dsttt;
+    IVC *image[3];
     int x, y;
     long int pos;
+    image[0] = vc_read_image("Images/labelling-2.pgm");
+    image[1] = vc_image_new(image[0]->width, image[0]->height, 1, 1);
+    image[2] = vc_image_new(image[0]->width, image[0]->height, 1, 1);
 
-    src = vc_read_image("Images/FLIR/flir-01.pgm");
-    dst = vc_image_new(src->width, src->height, 1, 1);
-    dstt = vc_image_new(src->width, src->height, 1, 1);
-    dsttt = vc_image_new(src->width, src->height, 1, 1);
+    
 
-    if(src == NULL)
+    if(image[0] == NULL)
     {
         printf("ERROR -> vc_read_image():\n\tFile not found!\n");
         getchar();
         return 0;
     }
 
-    if(dst == NULL)
+    if(image[1] == NULL)
+    {
+        printf("ERROR -> vc_read_image():\n\tFile not found!\n");
+        getchar();
+        return 0;
+    }
+
+    if(image[2] == NULL)
     {
         printf("ERROR -> vc_read_image():\n\tFile not found!\n");
         getchar();
@@ -28,21 +35,21 @@ int main(void){
 
     
    
-    vc_gray_to_binary(src, dst, 120);
-    vc_binary_erode(dst, dstt, 3);
-    vc_binary_dilate(dstt, dsttt, 3);
-
-    vc_write_image("teste1.pbm", dst);
-    vc_write_image("teste2.pbm", dstt);
-    vc_write_image("teste3.pbm", dsttt);
+    //vc_gray_to_binary(image[0], image[1], 120);
+    
+    vc_binary_blob_labelling(image[0], image[1]);
 
 
-    vc_image_free(src);
-    vc_image_free(dst);
-    vc_image_free(dstt);
-    vc_image_free(dsttt);
+    vc_write_image("openClose.pbm", image[1]); 
+    
+    vc_image_free(image[0]);
+    vc_image_free(image[1]);
+    //vc_image_free(image[2]);
 
+   
 
+ /* vc_binary_dilate(dst, src, 3);
+    vc_binary_erode(src, dst, 3); */
 
     printf("Press any key to exit...\n");
     getchar();
