@@ -1,8 +1,8 @@
-output: main.o vc.o
-		gcc main.o vc.o -o prog
+output: p1.o vc.o
+		gcc p1.o vc.o -o p1
 
-main.o: main.c
-		gcc -c main.c
+p1.o: p1.c
+		gcc -c p1.c
 
 vc.o: vc.c vc.h
 	  gcc -c vc.c

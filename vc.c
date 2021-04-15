@@ -15,6 +15,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <malloc.h>
+#include <math.h>
 #include "vc.h"
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -689,11 +690,28 @@ int vc_gray_to_binary(IVC *src, IVC *dst, int threshold)
     {
         if (src->data[i] > threshold)
         {
-            dst->data[i] = 1;
+            dst->data[i] = 255;
         }
         else
         {
             dst->data[i] = 0;
+        }
+    }
+}
+
+int vc_gray_to_binary_max_min(IVC *src, IVC *dst, int minThreshold, int maxThreshold)
+{
+    int size = src->height * src->width;
+
+    for (int i = 0; i < size; i++)
+    {
+        if (src->data[i] > maxThreshold || src->data[i] < minThreshold)
+        {
+            dst->data[i] = 0;
+        }
+        else
+        {
+            dst->data[i] = 255;
         }
     }
 }
@@ -709,6 +727,9 @@ int vc_gray_to_binary_global_mean(IVC *src, IVC *dst)
     }
 
     int threshold = count / size;
+
+    printf("%d\n", threshold);
+    getchar();
 
     vc_gray_to_binary(src, dst, threshold);
 }
@@ -907,7 +928,7 @@ int vc_binary_close(IVC *src, IVC *dst, int kernel)
     vc_binary_erode(tmp, dst, kernel);
 }
 
-int vc_binary_blob_labelling(IVC *src, IVC *dst)
+/* int vc_binary_blob_labelling(IVC *src, IVC *dst)
 {
     int label = 1;
     int pos_src, pos_dst;
@@ -964,4 +985,408 @@ int vc_binary_blob_labelling(IVC *src, IVC *dst)
     }
 
     printf("Label: %d\n", label);
+} */
+
+// Etiquetagem de blobs
+// src		: Imagem binária de entrada
+// dst		: Imagem grayscale (irá conter as etiquetas)
+// nlabels	: Endereço de memória de uma variável, onde será armazenado o número de etiquetas encontradas.
+// OVC*		: Retorna um array de estruturas de blobs (objectos), com respectivas etiquetas. É necessário libertar posteriormente esta memória.
+OVC* vc_binary_blob_labelling(IVC *src, IVC *dst, int *nlabels)
+{
+	unsigned char *datasrc = (unsigned char *)src->data;
+	unsigned char *datadst = (unsigned char *)dst->data;
+	int width = src->width;
+	int height = src->height;
+	int bytesperline = src->bytesperline;
+	int channels = src->channels;
+	int x, y, a, b;
+	long int i, size;
+	long int posX, posA, posB, posC, posD;
+	int labeltable[256] = { 0 };
+	int labelarea[256] = { 0 };
+	int label = 1; // Etiqueta inicial.
+	int num, tmplabel;
+	OVC *blobs; // Apontador para array de blobs (objectos) que será retornado desta função.
+
+	// Verificação de erros
+	if ((src->width <= 0) || (src->height <= 0) || (src->data == NULL)) return 0;
+	if ((src->width != dst->width) || (src->height != dst->height) || (src->channels != dst->channels)) return NULL;
+	if (channels != 1) return NULL;
+
+	// Copia dados da imagem binária para imagem grayscale
+	memcpy(datadst, datasrc, bytesperline * height);
+
+	// Todos os pixéis de plano de fundo devem obrigatóriamente ter valor 0
+	// Todos os pixéis de primeiro plano devem obrigatóriamente ter valor 255
+	// Serão atribuídas etiquetas no intervalo [1,254]
+	// Este algoritmo está assim limitado a 255 labels
+	for (i = 0, size = bytesperline * height; i<size; i++)
+	{
+		if (datadst[i] != 0) datadst[i] = 255;
+	}
+
+	// Limpa os rebordos da imagem binária
+	for (y = 0; y<height; y++)
+	{
+		datadst[y * bytesperline + 0 * channels] = 0;
+		datadst[y * bytesperline + (width - 1) * channels] = 0;
+	}
+	for (x = 0; x<width; x++)
+	{
+		datadst[0 * bytesperline + x * channels] = 0;
+		datadst[(height - 1) * bytesperline + x * channels] = 0;
+	}
+
+	// Efectua a etiquetagem
+	for (y = 1; y<height - 1; y++)
+	{
+		for (x = 1; x<width - 1; x++)
+		{
+			// Kernel:
+			// A B C
+			// D X
+
+			posA = (y - 1) * bytesperline + (x - 1) * channels; // A
+			posB = (y - 1) * bytesperline + x * channels; // B
+			posC = (y - 1) * bytesperline + (x + 1) * channels; // C
+			posD = y * bytesperline + (x - 1) * channels; // D
+			posX = y * bytesperline + x * channels; // X
+
+			// Se o pixel foi marcado
+			if (datadst[posX] != 0)
+			{
+				if ((datadst[posA] == 0) && (datadst[posB] == 0) && (datadst[posC] == 0) && (datadst[posD] == 0))
+				{
+					datadst[posX] = label;
+					labeltable[label] = label;
+					label++;
+				}
+				else
+				{
+					num = 255;
+
+					// Se A está marcado
+					if (datadst[posA] != 0) num = labeltable[datadst[posA]];
+					// Se B está marcado, e é menor que a etiqueta "num"
+					if ((datadst[posB] != 0) && (labeltable[datadst[posB]] < num)) num = labeltable[datadst[posB]];
+					// Se C está marcado, e é menor que a etiqueta "num"
+					if ((datadst[posC] != 0) && (labeltable[datadst[posC]] < num)) num = labeltable[datadst[posC]];
+					// Se D está marcado, e é menor que a etiqueta "num"
+					if ((datadst[posD] != 0) && (labeltable[datadst[posD]] < num)) num = labeltable[datadst[posD]];
+
+					// Atribui a etiqueta ao pixel
+					datadst[posX] = num;
+					labeltable[num] = num;
+
+					// Actualiza a tabela de etiquetas
+					if (datadst[posA] != 0)
+					{
+						if (labeltable[datadst[posA]] != num)
+						{
+							for (tmplabel = labeltable[datadst[posA]], a = 1; a<label; a++)
+							{
+								if (labeltable[a] == tmplabel)
+								{
+									labeltable[a] = num;
+								}
+							}
+						}
+					}
+					if (datadst[posB] != 0)
+					{
+						if (labeltable[datadst[posB]] != num)
+						{
+							for (tmplabel = labeltable[datadst[posB]], a = 1; a<label; a++)
+							{
+								if (labeltable[a] == tmplabel)
+								{
+									labeltable[a] = num;
+								}
+							}
+						}
+					}
+					if (datadst[posC] != 0)
+					{
+						if (labeltable[datadst[posC]] != num)
+						{
+							for (tmplabel = labeltable[datadst[posC]], a = 1; a<label; a++)
+							{
+								if (labeltable[a] == tmplabel)
+								{
+									labeltable[a] = num;
+								}
+							}
+						}
+					}
+					if (datadst[posD] != 0)
+					{
+						if (labeltable[datadst[posD]] != num)
+						{
+							for (tmplabel = labeltable[datadst[posC]], a = 1; a<label; a++)
+							{
+								if (labeltable[a] == tmplabel)
+								{
+									labeltable[a] = num;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Volta a etiquetar a imagem
+	for (y = 1; y<height - 1; y++)
+	{
+		for (x = 1; x<width - 1; x++)
+		{
+			posX = y * bytesperline + x * channels; // X
+
+			if (datadst[posX] != 0)
+			{
+				datadst[posX] = labeltable[datadst[posX]];
+			}
+		}
+	}
+
+	//printf("\nMax Label = %d\n", label);
+
+	// Contagem do número de blobs
+	// Passo 1: Eliminar, da tabela, etiquetas repetidas
+	for (a = 1; a<label - 1; a++)
+	{
+		for (b = a + 1; b<label; b++)
+		{
+			if (labeltable[a] == labeltable[b]) labeltable[b] = 0;
+		}
+	}
+	// Passo 2: Conta etiquetas e organiza a tabela de etiquetas, para que não hajam valores vazios (zero) entre etiquetas
+	*nlabels = 0;
+	for (a = 1; a<label; a++)
+	{
+		if (labeltable[a] != 0)
+		{
+			labeltable[*nlabels] = labeltable[a]; // Organiza tabela de etiquetas
+			(*nlabels)++; // Conta etiquetas
+		}
+	}
+
+	// Se não há blobs
+	if (*nlabels == 0) return NULL;
+   
+	// Cria lista de blobs (objectos) e preenche a etiqueta
+	blobs = (OVC *)calloc((*nlabels), sizeof(OVC));
+	if (blobs != NULL)
+	{
+		for (a = 0; a<(*nlabels); a++) blobs[a].label = labeltable[a];
+	}
+	else return NULL;
+
+	return blobs;
+}
+
+
+int vc_binary_blob_info(IVC *src, OVC *blobs, int nblobs)
+{
+	unsigned char *data = (unsigned char *)src->data;
+	int width = src->width;
+	int height = src->height;
+	int bytesperline = src->bytesperline;
+	int channels = src->channels;
+	int x, y, i;
+	long int pos;
+	int xmin, ymin, xmax, ymax;
+	long int sumx, sumy;
+
+	// Verificação de erros
+	if ((src->width <= 0) || (src->height <= 0) || (src->data == NULL)) return 0;
+	if (channels != 1) return 0;
+
+    
+
+	// Conta área de cada blob
+	for (i = 0; i<nblobs; i++)
+	{
+		xmin = width - 1;
+		ymin = height - 1;
+		xmax = 0;
+		ymax = 0;
+
+		sumx = 0;
+		sumy = 0;
+
+		blobs[i].area = 0;
+
+		for (y = 1; y<height - 1; y++)
+		{
+			for (x = 1; x<width - 1; x++)
+			{
+				pos = y * bytesperline + x * channels;
+
+				if (data[pos] == blobs[i].label)
+				{
+					// Área
+					blobs[i].area++;
+
+					// Centro de Gravidade
+					sumx += x;
+					sumy += y;
+
+					// Bounding Box
+					if (xmin > x) xmin = x;
+					if (ymin > y) ymin = y;
+					if (xmax < x) xmax = x;
+					if (ymax < y) ymax = y;
+
+					// Perímetro
+					// Se pelo menos um dos quatro vizinhos não pertence ao mesmo label, então é um pixel de contorno
+					if ((data[pos - 1] != blobs[i].label) || (data[pos + 1] != blobs[i].label) || (data[pos - bytesperline] != blobs[i].label) || (data[pos + bytesperline] != blobs[i].label))
+					{
+						blobs[i].perimeter++;
+					}
+				}
+			}
+		}
+
+		// Bounding Box
+		blobs[i].x = xmin;
+		blobs[i].y = ymin;
+		blobs[i].width = (xmax - xmin) + 1;
+		blobs[i].height = (ymax - ymin) + 1;
+
+		// Centro de Gravidade
+		//blobs[i].xc = (xmax - xmin) / 2;
+		//blobs[i].yc = (ymax - ymin) / 2;
+		blobs[i].xc = sumx / MAX(blobs[i].area, 1);
+		blobs[i].yc = sumy / MAX(blobs[i].area, 1);
+	}
+
+	return 1;
+}
+
+int teste(IVC* src, IVC* dst)
+{
+    int i;
+    int pos;
+    int hist[256];
+    int normhist[256];
+    int histmax;
+    float npixels;
+    int y, x;
+
+    for(y = 0; y < src->height; y++)
+    {
+        for(x = 0; x < src->width; x++)
+        {
+            pos = y * src->bytesperline + x * src->channels;
+
+            dst->data[pos] = 0;
+
+            hist[src->data[pos]]++;
+        }
+    }
+        if(1)
+        {
+            for(i = 0; histmax = 0; i < 256)
+            {
+                if(histmax < hist[i]) histmax = hist[i];
+            }
+
+            for(i = 0; i < 256; i++)
+            {
+                normhist[i] = (float)hist[i] / (float)histmax;
+            }
+        }
+        else
+        {
+            for(i = 0; i < 256; i++)
+            {
+                normhist[i] = (float)hist[i] / (float)npixels;
+            }
+        }
+    
+
+    for(i = 0, x = (src->width - 256) / 2; i < 256; i++, x++)
+    {
+        for(y < src->height - 1; y > src->height - 1 - normhist[i] * src->height; y++)
+        {
+            dst->data[y * src->bytesperline + x * src->channels] = 255;
+        }
+    }
+}
+
+
+int vc_gray_histogram_equalization(IVC *src, IVC *dst)
+{
+    int x, y, pos;
+    int levels[256] = {0};
+    float pdf[256] = {0.0f};
+    float cdf[256], cdf_min;
+
+
+    //Calcular a quantidade de pixeis existente para cada nivel de brilho
+    for(y = 0; y < src->height; y++)
+    {
+        for(x = 0; x < src->width; x++)
+        {
+            pos = y * src->bytesperline + x;
+
+            levels[src->data[pos]]++;
+        }
+    }
+
+    //Calcular função densidade probabilidade
+    //Para cada nivel de brilho, dividir pelo número total de pixeis
+    for(int i = 0; i < 256; i++)
+    {
+        
+        pdf[i] = (float)levels[i] / (float)(src->width * src->height); 
+        if(i == 0)
+        {
+            cdf[0] = pdf[0];
+        }
+        else
+        {
+            cdf[i] = cdf[i-1] + pdf[i];
+        }
+    }
+
+    //Calcular cdf min
+    for(int i = 0, cdf_min = cdf[0]; i < 256; i++)
+    {
+        if(cdf[i] > 0.0)
+        {
+            cdf_min = cdf[i];
+            break;
+        }
+    }
+
+     for(y = 0; y < src->height; y++)
+    {
+        for(x = 0; x < src->width; x++)
+        {
+            pos = y * src->bytesperline + x;
+
+            dst->data[pos] = (unsigned char)((cdf[src->data[pos]] - cdf_min) / (1.0f - cdf_min) * 255.0f);
+        }
+    }
+
+    return 1;
+    
+}
+
+
+void vc_gray_label(IVC *src, IVC *dst)
+{
+    int size = src->width * src->height;
+
+    for(int i = 0; i < size; i++)
+    {
+        if(dst->data[i] != 0)
+        {
+            dst->data[i] = src->data[i];
+        }
+    }
 }
